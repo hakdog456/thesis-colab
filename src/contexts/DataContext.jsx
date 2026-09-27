@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { dataService } from '../services/dataService';
 import { useAuth } from './AuthContext';
 
@@ -21,6 +21,33 @@ export function DataProvider({ children }) {
   // Toasts
   const [toasts, setToasts] = useState([]);
 
+  // Setup real-time listeners with Firebase Firestore
+  useEffect(() => {
+    const unsubDoc = dataService.subscribeToDocument((updatedDoc) => {
+      setDocument(JSON.parse(JSON.stringify(updatedDoc)));
+    });
+    const unsubTasks = dataService.subscribeToTasks((updatedTasks) => {
+      setTasks(JSON.parse(JSON.stringify(updatedTasks)));
+    });
+    const unsubVersions = dataService.subscribeToVersions((updatedVersions) => {
+      setVersions(JSON.parse(JSON.stringify(updatedVersions)));
+    });
+    const unsubComments = dataService.subscribeToComments((updatedComments) => {
+      setComments(JSON.parse(JSON.stringify(updatedComments)));
+    });
+    const unsubRecords = dataService.subscribeToChangeRecords((updatedRecords) => {
+      setChangeRecords(JSON.parse(JSON.stringify(updatedRecords)));
+    });
+
+    return () => {
+      unsubDoc();
+      unsubTasks();
+      unsubVersions();
+      unsubComments();
+      unsubRecords();
+    };
+  }, []);
+
   const addToast = useCallback((message, type = 'info', duration = 3000) => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -33,7 +60,6 @@ export function DataProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Reload everything from service
   const refreshData = useCallback(() => {
     setDocument(dataService.getDocument('doc-1'));
     setTasks(dataService.getTasks('doc-1'));
@@ -49,7 +75,6 @@ export function DataProvider({ children }) {
   const claimTask = useCallback((taskId) => {
     try {
       const updated = dataService.claimTask(taskId, currentUser.id);
-      refreshData();
       setSelectedTaskId(taskId);
       addToast(`Claimed task "${updated.title}"`, 'success');
       return updated;
@@ -57,7 +82,7 @@ export function DataProvider({ children }) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, refreshData, addToast]);
+  }, [currentUser, addToast]);
 
   const releaseTask = useCallback((taskId) => {
     try {
@@ -65,14 +90,13 @@ export function DataProvider({ children }) {
       if (editingTaskId === taskId) {
         setEditingTaskId(null);
       }
-      refreshData();
       addToast(`Released task "${updated.title}"`, 'info');
       return updated;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, editingTaskId, refreshData, addToast]);
+  }, [currentUser, editingTaskId, addToast]);
 
   const dropTask = useCallback((taskId, reason = '') => {
     try {
@@ -80,26 +104,23 @@ export function DataProvider({ children }) {
       if (editingTaskId === taskId) {
         setEditingTaskId(null);
       }
-      refreshData();
       addToast(`Dropped task "${updated.title}"`, 'info');
       return updated;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, editingTaskId, refreshData, addToast]);
+  }, [currentUser, editingTaskId, addToast]);
 
   const startEditingTask = useCallback((taskId) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    // Block non-owners
     if (task.ownerId && task.ownerId !== currentUser.id) {
       addToast(`Only the assigned owner can edit this task. You can only view it.`, 'error');
       return;
     }
 
-    // Block unclaimed tasks — user must click Claim first
     if (!task.ownerId) {
       addToast('Claim this task first before editing.', 'info');
       return;
@@ -116,37 +137,34 @@ export function DataProvider({ children }) {
   const saveOfficialChange = useCallback((taskId, newContent) => {
     try {
       const result = dataService.saveOfficialDocumentChange(taskId, newContent, currentUser.id);
-      refreshData();
       return result;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, refreshData, addToast]);
+  }, [currentUser, addToast]);
 
   const markTaskReviewed = useCallback((taskId) => {
     try {
       const result = dataService.markTaskReviewed(taskId, currentUser.id);
-      refreshData();
       addToast('Marked as reviewed! Yellow highlight removed.', 'success');
       return result;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, refreshData, addToast]);
+  }, [currentUser, addToast]);
 
   const requestTaskChanges = useCallback((taskId, feedbackNote) => {
     try {
       const result = dataService.requestTaskChanges(taskId, currentUser.id, feedbackNote);
-      refreshData();
       addToast('Feedback sent. Task returned to the author.', 'info');
       return result;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, refreshData, addToast]);
+  }, [currentUser, addToast]);
 
   const markTaskDone = useCallback((taskId) => {
     try {
@@ -154,14 +172,13 @@ export function DataProvider({ children }) {
       if (editingTaskId === taskId) {
         setEditingTaskId(null);
       }
-      refreshData();
       addToast('Task marked as completed!', 'success');
       return result;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [editingTaskId, refreshData, addToast]);
+  }, [editingTaskId, addToast]);
 
   const createTask = useCallback((taskData) => {
     try {
@@ -169,7 +186,6 @@ export function DataProvider({ children }) {
         ...taskData,
         createdBy: currentUser.id,
       });
-      refreshData();
       setSelectedTaskId(newTask.id);
       addToast(`Task "${newTask.title}" created`, 'success');
       return newTask;
@@ -177,7 +193,7 @@ export function DataProvider({ children }) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, refreshData, addToast]);
+  }, [currentUser, addToast]);
 
   const addComment = useCallback((commentData) => {
     try {
@@ -185,13 +201,12 @@ export function DataProvider({ children }) {
         ...commentData,
         authorId: currentUser.id,
       });
-      refreshData();
       return comment;
     } catch (err) {
       addToast(err.message, 'error');
       throw err;
     }
-  }, [currentUser, refreshData, addToast]);
+  }, [currentUser, addToast]);
 
   const getChangeRecord = useCallback((taskId) => {
     return dataService.getChangeRecordByTaskId(taskId);

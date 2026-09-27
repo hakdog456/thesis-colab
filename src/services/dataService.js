@@ -1,4 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
+import { db } from './firebase.js';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  getDocs,
+  onSnapshot,
+  query,
+  orderBy
+} from 'firebase/firestore';
 import {
   sampleDocument,
   sampleTasks,
@@ -8,17 +20,15 @@ import {
 } from '../data/sampleData.js';
 import { TASK_STATUS } from '../utils/constants.js';
 
-// In-memory state
+// In-memory state as fallback & local cache
 let currentDocument = JSON.parse(JSON.stringify(sampleDocument));
 let tasks = JSON.parse(JSON.stringify(sampleTasks));
 let versions = JSON.parse(JSON.stringify(sampleVersions));
 let comments = JSON.parse(JSON.stringify(sampleComments));
-let changeRecords = []; // Array of change records
+let changeRecords = [];
 
-// Helper: deep clone
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
-// Helper: find block in Tiptap JSON document by blockId
 export function findBlockNode(docContent, blockId) {
   if (!docContent || !docContent.content) return null;
   for (const node of docContent.content) {
@@ -29,7 +39,6 @@ export function findBlockNode(docContent, blockId) {
   return null;
 }
 
-// Helper: get plain text of a block
 export function getBlockText(blockNode) {
   if (!blockNode || !blockNode.content) return '';
   return blockNode.content.map((c) => c.text || '').join('');
@@ -43,7 +52,6 @@ function getDocumentText(docContent) {
     .join('\n');
 }
 
-// Helper: replace block text content in Tiptap JSON document
 export function updateBlockContent(docContent, blockId, newText) {
   if (!docContent || !docContent.content) return false;
   const index = docContent.content.findIndex(
@@ -52,7 +60,6 @@ export function updateBlockContent(docContent, blockId, newText) {
   if (index === -1) return false;
 
   if (newText === null || newText === undefined || newText === '') {
-    // If empty text or deletion
     docContent.content[index].content = [];
   } else {
     docContent.content[index].content = [{ type: 'text', text: newText }];
@@ -60,7 +67,6 @@ export function updateBlockContent(docContent, blockId, newText) {
   return true;
 }
 
-// Helper: delete block completely from document
 export function deleteBlockNode(docContent, blockId) {
   if (!docContent || !docContent.content) return false;
   const index = docContent.content.findIndex(
@@ -71,8 +77,136 @@ export function deleteBlockNode(docContent, blockId) {
   return true;
 }
 
+// Sync helper to write document to Firestore
+async function syncDocumentToFirestore(docData) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'documents', docData.id || 'doc-1'), docData);
+  } catch (e) {
+    console.warn('Firestore doc write error:', e);
+  }
+}
+
+async function syncTaskToFirestore(taskData) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'tasks', taskData.id), taskData);
+  } catch (e) {
+    console.warn('Firestore task write error:', e);
+  }
+}
+
+async function syncVersionToFirestore(versionData) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'versions', versionData.id), versionData);
+  } catch (e) {
+    console.warn('Firestore version write error:', e);
+  }
+}
+
+async function syncCommentToFirestore(commentData) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'comments', commentData.id), commentData);
+  } catch (e) {
+    console.warn('Firestore comment write error:', e);
+  }
+}
+
+async function syncChangeRecordToFirestore(recordData) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'changeRecords', recordData.id), recordData);
+  } catch (e) {
+    console.warn('Firestore changeRecord write error:', e);
+  }
+}
+
 export const dataService = {
-  // ── Documents ─────────────────────────────────────────
+  // Real-time Firestore Subscribers
+  subscribeToDocument(callback) {
+    if (!db) {
+      callback(currentDocument);
+      return () => {};
+    }
+    const docRef = doc(db, 'documents', 'doc-1');
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        currentDocument = docSnap.data();
+        callback(currentDocument);
+      } else {
+        // Initialize doc-1 in Firestore if empty
+        syncDocumentToFirestore(currentDocument);
+        callback(currentDocument);
+      }
+    });
+  },
+
+  subscribeToTasks(callback) {
+    if (!db) {
+      callback(tasks);
+      return () => {};
+    }
+    const colRef = collection(db, 'tasks');
+    return onSnapshot(colRef, (snapshot) => {
+      if (!snapshot.empty) {
+        tasks = snapshot.docs.map(doc => doc.data());
+        callback(tasks);
+      } else {
+        // Seed default sample tasks
+        sampleTasks.forEach(t => syncTaskToFirestore(t));
+        callback(tasks);
+      }
+    });
+  },
+
+  subscribeToVersions(callback) {
+    if (!db) {
+      callback(versions);
+      return () => {};
+    }
+    const colRef = collection(db, 'versions');
+    return onSnapshot(colRef, (snapshot) => {
+      if (!snapshot.empty) {
+        versions = snapshot.docs.map(doc => doc.data()).sort((a, b) => b.versionNumber - a.versionNumber);
+        callback(versions);
+      } else {
+        sampleVersions.forEach(v => syncVersionToFirestore(v));
+        callback(versions);
+      }
+    });
+  },
+
+  subscribeToComments(callback) {
+    if (!db) {
+      callback(comments);
+      return () => {};
+    }
+    const colRef = collection(db, 'comments');
+    return onSnapshot(colRef, (snapshot) => {
+      if (!snapshot.empty) {
+        comments = snapshot.docs.map(doc => doc.data());
+        callback(comments);
+      } else {
+        sampleComments.forEach(c => syncCommentToFirestore(c));
+        callback(comments);
+      }
+    });
+  },
+
+  subscribeToChangeRecords(callback) {
+    if (!db) {
+      callback(changeRecords);
+      return () => {};
+    }
+    const colRef = collection(db, 'changeRecords');
+    return onSnapshot(colRef, (snapshot) => {
+      changeRecords = snapshot.docs.map(doc => doc.data());
+      callback(changeRecords);
+    });
+  },
+
   getDocument(documentId = 'doc-1') {
     return clone(currentDocument);
   },
@@ -86,7 +220,6 @@ export const dataService = {
     return version ? clone(version) : null;
   },
 
-  // ── Tasks ─────────────────────────────────────────────
   getTasks(documentId = 'doc-1') {
     return clone(tasks);
   },
@@ -120,6 +253,7 @@ export const dataService = {
       updatedAt: new Date().toISOString(),
     };
     tasks.push(newTask);
+    syncTaskToFirestore(newTask);
     return clone(newTask);
   },
 
@@ -134,6 +268,7 @@ export const dataService = {
     task.ownerId = userId;
     task.status = TASK_STATUS.IN_PROGRESS;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
     return clone(task);
   },
 
@@ -148,6 +283,7 @@ export const dataService = {
     task.ownerId = null;
     task.status = TASK_STATUS.AVAILABLE;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
     return clone(task);
   },
 
@@ -165,8 +301,9 @@ export const dataService = {
     task.ownerId = null;
     task.status = TASK_STATUS.AVAILABLE;
     task.updatedAt = droppedAt;
+    syncTaskToFirestore(task);
 
-    comments.push({
+    const newComment = {
       id: `comment-${uuidv4().slice(0, 8)}`,
       documentId: task.documentId,
       taskId,
@@ -179,7 +316,9 @@ export const dataService = {
       status: 'open',
       parentCommentId: null,
       createdAt: droppedAt,
-    });
+    };
+    comments.push(newComment);
+    syncCommentToFirestore(newComment);
 
     return clone(task);
   },
@@ -189,10 +328,10 @@ export const dataService = {
     if (!task) throw new Error('Task not found');
     task.status = status;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
     return clone(task);
   },
 
-  // ── Official Document Direct Edit & Autosave (Sections 1, 4 & 9) ──
   saveOfficialDocumentChange(taskId, newContent, userId) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) throw new Error('Task not found');
@@ -211,7 +350,6 @@ export const dataService = {
 
     const isDeletion = !isWholeDocument && normalizedContent === '';
 
-    // Check if we already have an unreviewed change record for this task
     let record = changeRecords.find((r) => r.taskId === taskId && !r.isReviewed);
 
     if (!record && existingOriginalText === normalizedText) {
@@ -233,13 +371,11 @@ export const dataService = {
     }
 
     if (record) {
-      // Update existing record
       record.newContent = normalizedText;
       record.isDeleted = isDeletion;
       record.changedAt = new Date().toISOString();
       record.changedBy = userId || task.ownerId;
     } else {
-      // Create new change record
       record = {
         id: `change-${uuidv4().slice(0, 8)}`,
         taskId,
@@ -259,8 +395,8 @@ export const dataService = {
       };
       changeRecords.unshift(record);
     }
+    syncChangeRecordToFirestore(record);
 
-    // 1. Immediately update official document content
     if (isWholeDocument) {
       currentDocument.content = normalizedContent;
     } else if (isDeletion) {
@@ -269,14 +405,12 @@ export const dataService = {
       updateBlockContent(currentDocument.content, targetBlockId, normalizedContent);
     }
     currentDocument.updatedAt = new Date().toISOString();
+    syncDocumentToFirestore(currentDocument);
 
-    // 2. Mark task status as CHANGED
     task.status = TASK_STATUS.CHANGED;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
 
-
-
-    // 3. Mint Version N -> Version N+1
     const newVersionNumber = versions.length + 1;
     const newVersionId = `ver-${newVersionNumber}`;
     currentDocument.currentVersionId = newVersionId;
@@ -294,6 +428,7 @@ export const dataService = {
       createdAt: new Date().toISOString(),
     };
     versions.unshift(newVersion);
+    syncVersionToFirestore(newVersion);
 
     return {
       document: clone(currentDocument),
@@ -303,22 +438,21 @@ export const dataService = {
     };
   },
 
-  // ── Teammate Review (Sections 5 & 10) ──────────────────
   markTaskReviewed(taskId, reviewerId) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) throw new Error('Task not found');
 
-    // Find active change record and mark as reviewed
     const record = changeRecords.find((r) => r.taskId === taskId && !r.isReviewed);
     if (record) {
       record.isReviewed = true;
       record.reviewedBy = reviewerId;
       record.reviewedAt = new Date().toISOString();
+      syncChangeRecordToFirestore(record);
     }
 
-    // Update task status to REVIEWED
     task.status = TASK_STATUS.REVIEWED;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
 
     return {
       task: clone(task),
@@ -348,8 +482,9 @@ export const dataService = {
     record.lastFeedbackNote = note;
     record.lastFeedbackBy = reviewerId;
     record.lastFeedbackAt = event.createdAt;
+    syncChangeRecordToFirestore(record);
 
-    comments.push({
+    const newComment = {
       id: `comment-${uuidv4().slice(0, 8)}`,
       documentId: task.documentId,
       taskId,
@@ -359,10 +494,13 @@ export const dataService = {
       status: 'open',
       parentCommentId: null,
       createdAt: event.createdAt,
-    });
+    };
+    comments.push(newComment);
+    syncCommentToFirestore(newComment);
 
     task.status = TASK_STATUS.CHANGES_REQUESTED;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
 
     return {
       task: clone(task),
@@ -377,6 +515,7 @@ export const dataService = {
 
     task.status = TASK_STATUS.DONE;
     task.updatedAt = new Date().toISOString();
+    syncTaskToFirestore(task);
     return clone(task);
   },
 
@@ -392,7 +531,6 @@ export const dataService = {
     return historicalRecord ? clone(historicalRecord) : null;
   },
 
-  // ── Versions (Section 15) ─────────────────────────────
   getVersionHistory(documentId = 'doc-1') {
     return clone(versions);
   },
@@ -402,7 +540,6 @@ export const dataService = {
     return ver ? clone(ver) : null;
   },
 
-  // ── Comments ──────────────────────────────────────────
   getComments(filters = {}) {
     let result = clone(comments);
     if (filters.taskId) {
@@ -425,15 +562,19 @@ export const dataService = {
       createdAt: new Date().toISOString(),
     };
     comments.push(newComment);
+    syncCommentToFirestore(newComment);
     return clone(newComment);
   },
 
-  // ── Reset ─────────────────────────────────────────────
   resetData() {
     currentDocument = JSON.parse(JSON.stringify(sampleDocument));
     tasks = JSON.parse(JSON.stringify(sampleTasks));
     versions = JSON.parse(JSON.stringify(sampleVersions));
     comments = JSON.parse(JSON.stringify(sampleComments));
     changeRecords = [];
+    syncDocumentToFirestore(currentDocument);
+    sampleTasks.forEach(t => syncTaskToFirestore(t));
+    sampleVersions.forEach(v => syncVersionToFirestore(v));
+    sampleComments.forEach(c => syncCommentToFirestore(c));
   },
 };
