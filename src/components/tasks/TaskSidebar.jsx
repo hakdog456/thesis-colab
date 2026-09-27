@@ -37,13 +37,25 @@ export function TaskSidebar({ onNewTaskClick }) {
   const handleTaskClick = (task) => {
     selectTask(task.id);
 
-    // Navigate to the task's block — editing starts from the detail panel
+    // Navigate to the task's block & trigger flash animation
     if (task.target?.blockId) {
       const result = navigateToBlock(task.target.blockId);
       if (!result.success) {
         addToast('Target not found. This task needs attention.', 'error');
       }
     }
+
+    setTimeout(() => {
+      const el = document.querySelector(`[data-task-id="${task.id}"]`);
+      if (el) {
+        el.classList.remove('task-highlight--flash');
+        void el.offsetWidth;
+        el.classList.add('task-highlight--flash');
+        setTimeout(() => {
+          el.classList.remove('task-highlight--flash');
+        }, 1800);
+      }
+    }, 50);
   };
 
   const changedCount = tasks.filter((t) => (

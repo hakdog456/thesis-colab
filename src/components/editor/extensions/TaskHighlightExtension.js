@@ -47,17 +47,24 @@ export const TaskHighlightExtension = Extension.create({
             return this.getState(state);
           },
           handleClick(view, pos, event) {
-            // When in editing mode, do NOT intercept the click.
-            // Returning true here tells ProseMirror "I handled it",
-            // which prevents it from placing the text cursor — no cursor = no caret.
             if (currentOptions.isEditingMode) {
               return false;
             }
             const target = event.target.closest('[data-task-id]');
             if (target) {
               const taskId = target.getAttribute('data-task-id');
-              if (taskId && currentOptions.onTaskClick) {
-                currentOptions.onTaskClick(taskId);
+              if (taskId) {
+                // Trigger flash animation strictly on click
+                target.classList.remove('task-highlight--flash');
+                void target.offsetWidth; // force reflow
+                target.classList.add('task-highlight--flash');
+                setTimeout(() => {
+                  target.classList.remove('task-highlight--flash');
+                }, 1800);
+
+                if (currentOptions.onTaskClick) {
+                  currentOptions.onTaskClick(taskId);
+                }
                 return true;
               }
             }
@@ -74,9 +81,7 @@ function computeDecorations(doc, options) {
   const decorations = [];
 
   for (const task of tasks) {
-    // Only highlight active tasks
     if (task.status === TASK_STATUS.DONE || task.status === TASK_STATUS.REVIEWED) {
-      // Remove highlight when reviewed or done
       continue;
     }
 
@@ -101,7 +106,6 @@ function computeDecorations(doc, options) {
       className += `task-highlight--${taskColor.id} task-highlight--changes-requested `;
       labelText = `Changes requested for ${authorName}`;
     } else if (isChanged) {
-      // Soft color highlight + changed indicator
       className += `task-highlight--${taskColor.id} task-highlight--changed `;
       labelText = `Changed by ${authorName}`;
     } else {
@@ -110,7 +114,7 @@ function computeDecorations(doc, options) {
     }
 
     if (isSelected) {
-      className += 'task-highlight--emphasized task-highlight--flash ';
+      className += 'task-highlight--emphasized ';
     }
 
     decorations.push(

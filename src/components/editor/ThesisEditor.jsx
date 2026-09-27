@@ -247,30 +247,6 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
     editor.view.dispatch(tr);
   }, [tasks, selectedTaskId, isEditingMode, getUser, onSelectTask, editor, currentUser, startEditingTask]);
 
-  // Flash animation & auto-scroll when a task is selected
-  useEffect(() => {
-    if (!selectedTaskId || !editor) return;
-
-    const timer = setTimeout(() => {
-      const el = document.querySelector(`[data-task-id="${selectedTaskId}"]`);
-      if (el) {
-        try {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (e) {
-          el.scrollIntoView(true);
-        }
-        el.classList.remove('task-highlight--flash');
-        void el.offsetWidth; // force reflow
-        el.classList.add('task-highlight--flash');
-        setTimeout(() => {
-          el.classList.remove('task-highlight--flash');
-        }, 1800);
-      }
-    }, 60);
-
-    return () => clearTimeout(timer);
-  }, [selectedTaskId, editor]);
-
   // Re-sync document content when official document changes externally (e.g. from teammate or reset)
   useEffect(() => {
     if (!editor) return;
