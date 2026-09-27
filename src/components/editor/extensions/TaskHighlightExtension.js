@@ -110,7 +110,7 @@ function computeDecorations(doc, options) {
     }
 
     if (isSelected) {
-      className += 'task-highlight--emphasized ';
+      className += 'task-highlight--emphasized task-highlight--flash ';
     }
 
     decorations.push(
