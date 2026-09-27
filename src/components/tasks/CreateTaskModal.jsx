@@ -16,7 +16,7 @@ export function CreateTaskModal({ isOpen, onClose, initialTarget = null }) {
   const [sectionId, setSectionId] = useState(initialTarget?.sectionId || '2.1 Related Studies');
   const [anchorText, setAnchorText] = useState(initialTarget?.anchorText || '');
   const [blockId, setBlockId] = useState(initialTarget?.blockId || '');
-  const [isWholeDocument, setIsWholeDocument] = useState(!initialTarget);
+  const [isWholeDocument, setIsWholeDocument] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -25,7 +25,7 @@ export function CreateTaskModal({ isOpen, onClose, initialTarget = null }) {
     setDescription('');
     setPriority(PRIORITY.MEDIUM);
     setAssigneeId('');
-    setIsWholeDocument(!initialTarget);
+    setIsWholeDocument(false);
     setChapterId(initialTarget?.chapterId || 'Chapter 2');
     setSectionId(initialTarget?.sectionId || '2.1 Related Studies');
     setAnchorText(initialTarget?.anchorText || '');
@@ -68,10 +68,100 @@ export function CreateTaskModal({ isOpen, onClose, initialTarget = null }) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Title */}
+          {/* Step 1: Target Location & Highlighted Text Portion (First) */}
+          <div
+            style={{
+              background: 'var(--bg-app)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 'var(--radius-md)',
+              padding: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="detail-panel__label" style={{ marginBottom: 0 }}>
+                1. Target Text Portion
+              </span>
+              {anchorText && (
+                <span className="badge badge-blue" style={{ fontSize: 10 }}>
+                  Highlighted Text Selected
+                </span>
+              )}
+            </div>
+
+            {anchorText ? (
+              <div
+                style={{
+                  fontSize: 12,
+                  fontStyle: 'italic',
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  borderLeft: '3px solid var(--color-dustin)',
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  marginBottom: 10,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                "{anchorText}"
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--text-tertiary)',
+                  marginBottom: 10,
+                }}
+              >
+                Tip: Highlight text in the thesis editor to automatically target a specific passage.
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 mb-2" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={isWholeDocument}
+                onChange={(e) => setIsWholeDocument(e.target.checked)}
+                disabled={Boolean(initialTarget)}
+              />
+              <span>Edit the whole document freely (Unchecked by default)</span>
+            </label>
+
+            {!isWholeDocument && (
+              <>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Chapter (e.g. Chapter 2)"
+                    value={chapterId}
+                    onChange={(e) => setChapterId(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Section (e.g. 2.1 Related Studies)"
+                    value={sectionId}
+                    onChange={(e) => setSectionId(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Anchor text quote from the thesis..."
+                  value={anchorText}
+                  onChange={(e) => setAnchorText(e.target.value)}
+                />
+              </>
+            )}
+          </div>
+
+          {/* Step 2: Task Title & Details */}
           <div className="mb-4">
             <label className="detail-panel__label" htmlFor="task-title">
-              Task Title *
+              2. Task Title *
             </label>
             <input
               id="task-title"
@@ -136,60 +226,6 @@ export function CreateTaskModal({ isOpen, onClose, initialTarget = null }) {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Target Location / Anchor (P2) */}
-          <div
-            style={{
-              background: 'var(--bg-app)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              padding: 12,
-              marginBottom: 16,
-            }}
-          >
-            <div className="detail-panel__label mb-2">Target Document Anchor (P2)</div>
-
-            <label className="flex items-center gap-2 mb-3" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={isWholeDocument}
-                onChange={(e) => setIsWholeDocument(e.target.checked)}
-                disabled={Boolean(initialTarget)}
-              />
-              <span>Edit the whole document freely</span>
-            </label>
-
-            {!isWholeDocument && (
-              <>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Chapter (e.g. Chapter 2)"
-                    value={chapterId}
-                    onChange={(e) => setChapterId(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Section (e.g. 2.1 Related Studies)"
-                    value={sectionId}
-                    onChange={(e) => setSectionId(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                </div>
-
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Anchor text quote from the thesis..."
-                  value={anchorText}
-                  onChange={(e) => setAnchorText(e.target.value)}
-                />
-              </>
-            )}
           </div>
 
           {/* Footer */}
