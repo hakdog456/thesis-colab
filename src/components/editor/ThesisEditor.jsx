@@ -249,7 +249,7 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
       },
     });
     editor.view.dispatch(tr);
-  }, [tasks, selectedTaskId, editingTaskId, targetBlockId, isEditingMode, getUser, onSelectTask, editor, currentUser, startEditingTask]);
+  }, [tasks, selectedTaskId, editingTaskId, targetBlockId, isEditingMode, getUser, onSelectTask, editor]);
 
   // Re-sync document content when official document changes externally (e.g. from teammate or reset)
   useEffect(() => {

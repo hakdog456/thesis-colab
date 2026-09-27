@@ -85,7 +85,8 @@ export const EditGuardExtension = Extension.create({
               const allowedFrom = block.pos;
               const allowedTo = block.pos + block.node.nodeSize;
 
-              const isWithin = changeStart >= allowedFrom && changeEnd <= allowedTo;
+              // Allow changes that originate inside the assigned block
+              const isWithin = changeStart >= allowedFrom && changeStart <= allowedTo;
 
               if (!isWithin) {
                 notifyBlocked('You can only edit the block assigned to this task.');

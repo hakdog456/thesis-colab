@@ -410,6 +410,8 @@ export const dataService = {
     task.status = TASK_STATUS.CHANGED;
     if (task.target && !isWholeDocument && !isDeletion) {
       task.target.anchorText = normalizedText;
+      task.target.startOffset = 0;
+      task.target.endOffset = normalizedText.length;
     }
     task.updatedAt = new Date().toISOString();
     syncTaskToFirestore(task);

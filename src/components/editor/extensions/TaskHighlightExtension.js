@@ -57,12 +57,17 @@ export const TaskHighlightExtension = Extension.create({
             if (target) {
               const taskId = target.getAttribute('data-task-id');
               if (taskId) {
-                // Trigger flash animation strictly on click
-                target.classList.remove('task-highlight--flash');
-                void target.offsetWidth; // force reflow
-                target.classList.add('task-highlight--flash');
+                // Trigger flash animation on all fragments of this task highlight
+                const elements = document.querySelectorAll(`[data-task-id="${taskId}"]`);
+                elements.forEach((el) => {
+                  el.classList.remove('task-highlight--flash');
+                  void el.offsetWidth; // force reflow
+                  el.classList.add('task-highlight--flash');
+                });
                 setTimeout(() => {
-                  target.classList.remove('task-highlight--flash');
+                  elements.forEach((el) => {
+                    el.classList.remove('task-highlight--flash');
+                  });
                 }, 1800);
 
                 if (currentOptions.onTaskClick) {

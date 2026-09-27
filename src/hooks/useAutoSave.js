@@ -63,6 +63,14 @@ export function useAutoSave(onSave, delay = 1200) {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (pendingDataRef.current !== null && onSaveRef.current) {
+        try {
+          onSaveRef.current(pendingDataRef.current);
+          pendingDataRef.current = null;
+        } catch (err) {
+          console.error('Error flushing autosave on unmount:', err);
+        }
+      }
     };
   }, []);
 

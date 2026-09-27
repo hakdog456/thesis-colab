@@ -46,13 +46,17 @@ export function TaskSidebar({ onNewTaskClick }) {
     }
 
     setTimeout(() => {
-      const el = document.querySelector(`[data-task-id="${task.id}"]`);
-      if (el) {
+      const elements = document.querySelectorAll(`[data-task-id="${task.id}"]`);
+      elements.forEach((el) => {
         el.classList.remove('task-highlight--flash');
         void el.offsetWidth;
         el.classList.add('task-highlight--flash');
+      });
+      if (elements.length > 0) {
         setTimeout(() => {
-          el.classList.remove('task-highlight--flash');
+          elements.forEach((el) => {
+            el.classList.remove('task-highlight--flash');
+          });
         }, 1800);
       }
     }, 50);
