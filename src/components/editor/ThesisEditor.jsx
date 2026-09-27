@@ -148,24 +148,41 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
     onUpdate({ editor }) {
       // Read current editing state from ref to avoid stale closures
       const guard = guardRef.current;
-      if (!guard.isEditingMode) return;
+      if (!guard.isEditingMode || !guard.editingTask) return;
 
-      if (guard.isWholeDocumentTask) {
-        triggerChange(editor.getJSON());
-        return;
+      if (!guard.isWholeDocumentTask && guard.editingTargetBlockId) {
+        // Detect if Enter key created new paragraph blocks after the target block
+        const targetBlock = findBlockByIdInDoc(editor.state.doc, guard.editingTargetBlockId);
+        if (targetBlock) {
+          const currentTargetBlockIds = new Set([
+            guard.editingTargetBlockId,
+            ...(guard.editingTask.target?.additionalBlockIds || []),
+          ]);
+
+          let isAfterTarget = false;
+          editor.state.doc.descendants((node) => {
+            if (['heading', 'paragraph', 'blockquote'].includes(node.type.name) && node.attrs?.blockId) {
+              const bId = node.attrs.blockId;
+              if (bId === guard.editingTargetBlockId) {
+                isAfterTarget = true;
+              } else if (isAfterTarget) {
+                if (!currentTargetBlockIds.has(bId)) {
+                  if (!guard.editingTask.target.additionalBlockIds) {
+                    guard.editingTask.target.additionalBlockIds = [];
+                  }
+                  if (!guard.editingTask.target.additionalBlockIds.includes(bId)) {
+                    guard.editingTask.target.additionalBlockIds.push(bId);
+                    currentTargetBlockIds.add(bId);
+                  }
+                }
+              }
+            }
+          });
+        }
       }
 
-      if (!guard.editingTargetBlockId) return;
-
-      // Extract current text of target block
-      const block = findBlockByIdInDoc(editor.state.doc, guard.editingTargetBlockId);
-      if (block) {
-        const currentText = block.node.textContent;
-        triggerChange(currentText);
-      } else {
-        // Block deleted completely
-        triggerChange('');
-      }
+      // Always send full document JSON to preserve new paragraphs and document structure
+      triggerChange(editor.getJSON());
     },
 
 

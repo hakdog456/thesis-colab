@@ -127,37 +127,23 @@ function computeDecorations(doc, options) {
       className += 'task-highlight--emphasized ';
     }
 
-    // If currently editing this task, highlight its entire active target block
-    if (isEditingThis && editingTargetBlockId) {
-      const block = findBlockByIdInDoc(doc, editingTargetBlockId);
-      if (block) {
-        const from = block.pos + 1;
-        const to = block.pos + block.node.nodeSize - 1;
-        if (from < to) {
-          decorations.push(
-            Decoration.inline(from, to, {
-              class: className.trim(),
-              'data-task-id': task.id,
-              'data-tooltip': labelText,
-            })
-          );
-        }
-        continue;
-      }
-    }
-
     const resolution = resolveTaskTarget(doc, task.target);
     if (resolution.status === 'needs_attention' || resolution.from === undefined) {
       continue;
     }
 
-    decorations.push(
-      Decoration.inline(resolution.from, resolution.to, {
-        class: className.trim(),
-        'data-task-id': task.id,
-        'data-tooltip': labelText,
-      })
-    );
+    const ranges = resolution.ranges || [{ from: resolution.from, to: resolution.to }];
+    ranges.forEach((r) => {
+      if (r.from < r.to) {
+        decorations.push(
+          Decoration.inline(r.from, r.to, {
+            class: className.trim(),
+            'data-task-id': task.id,
+            'data-tooltip': labelText,
+          })
+        );
+      }
+    });
   }
 
   return DecorationSet.create(doc, decorations);

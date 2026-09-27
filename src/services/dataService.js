@@ -408,7 +408,9 @@ export const dataService = {
     }
     syncChangeRecordToFirestore(record);
 
-    if (isWholeDocument) {
+    if (typeof newContent === 'object' && newContent?.content) {
+      currentDocument.content = clone(newContent);
+    } else if (isWholeDocument) {
       currentDocument.content = normalizedContent;
     } else if (isDeletion) {
       updateBlockContent(currentDocument.content, targetBlockId, '');
@@ -419,11 +421,6 @@ export const dataService = {
     syncDocumentToFirestore(currentDocument);
 
     task.status = TASK_STATUS.CHANGED;
-    if (task.target && !isWholeDocument && !isDeletion) {
-      task.target.anchorText = normalizedText;
-      task.target.startOffset = 0;
-      task.target.endOffset = normalizedText.length;
-    }
     task.updatedAt = new Date().toISOString();
     syncTaskToFirestore(task);
 

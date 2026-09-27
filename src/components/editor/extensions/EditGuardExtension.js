@@ -80,31 +80,37 @@ export const EditGuardExtension = Extension.create({
 
           // ── EDITING MODE: target-scoped task ───────────────────────────────
           if (isEditingMode && editingTargetBlockId) {
-            const block = findBlockByIdInDoc(state.doc, editingTargetBlockId);
-            if (block) {
-              const allowedFrom = block.pos;
-              const allowedTo = block.pos + block.node.nodeSize;
+            const allowedBlockIds = [
+              editingTargetBlockId,
+              ...(editingTask?.target?.additionalBlockIds || []),
+            ];
 
-              // Allow changes that originate inside the assigned block
-              const isWithin = changeStart >= allowedFrom && changeStart <= allowedTo;
-
-              if (!isWithin) {
-                notifyBlocked('You can only edit the block assigned to this task.');
-                return false;
+            let isWithin = false;
+            for (const bId of allowedBlockIds) {
+              const block = findBlockByIdInDoc(state.doc, bId);
+              if (block) {
+                const allowedFrom = block.pos;
+                const allowedTo = block.pos + block.node.nodeSize;
+                if (changeStart >= allowedFrom && changeStart <= allowedTo) {
+                  isWithin = true;
+                  break;
+                }
               }
-
-              // Verify ownership
-              if (currentUserId && taskOwnerId && currentUserId !== taskOwnerId) {
-                const ownerObj = getUser ? getUser(taskOwnerId) : null;
-                const ownerName = ownerObj?.name || taskOwnerId;
-                notifyBlocked(`Only the assigned task owner (${ownerName}) is allowed to edit this section.`);
-                return false;
-              }
-              return true;
             }
 
-            notifyBlocked('The target block for this task no longer exists.');
-            return false;
+            if (!isWithin) {
+              notifyBlocked('You can only edit the block assigned to this task.');
+              return false;
+            }
+
+            // Verify ownership
+            if (currentUserId && taskOwnerId && currentUserId !== taskOwnerId) {
+              const ownerObj = getUser ? getUser(taskOwnerId) : null;
+              const ownerName = ownerObj?.name || taskOwnerId;
+              notifyBlocked(`Only the assigned task owner (${ownerName}) is allowed to edit this section.`);
+              return false;
+            }
+            return true;
           }
 
           // ── NOT IN EDITING MODE ───────────────────────────────────────────

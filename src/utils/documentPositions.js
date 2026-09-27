@@ -76,7 +76,7 @@ export function resolveTaskTarget(doc, target) {
     return { status: 'needs_attention', reason: 'Missing document or target' };
   }
 
-  // Find block by blockId
+  // Find primary block by blockId
   const block = findBlockByIdInDoc(doc, target.blockId);
   if (!block) {
     return {
@@ -87,75 +87,80 @@ export function resolveTaskTarget(doc, target) {
 
   const blockText = block.node.textContent || '';
   const anchorText = target.anchorText || '';
+  const ranges = [];
 
-  // 1. Exact match for anchorText within the block text
+  // 1. Exact match for anchorText within the primary block text
   if (anchorText) {
     const anchorMatch = findAnchorTextInBlock(block.node, anchorText);
     if (anchorMatch) {
-      const from = block.pos + 1 + anchorMatch.start;
-      const to = block.pos + 1 + anchorMatch.end;
-      return {
-        status: 'valid',
-        from,
-        to,
-        blockPos: block.pos,
-        blockNode: block.node,
-      };
+      ranges.push({
+        from: block.pos + 1 + anchorMatch.start,
+        to: block.pos + 1 + anchorMatch.end,
+      });
     }
   }
 
-  // 2. If anchorText doesn't match exactly (e.g. user edited it):
-  // Resolve bounds dynamically relative to block content without fixed cutoff
-  const startOffset = typeof target.startOffset === 'number' ? target.startOffset : 0;
-  const endOffset = typeof target.endOffset === 'number' ? target.endOffset : blockText.length;
+  if (ranges.length === 0) {
+    const startOffset = typeof target.startOffset === 'number' ? target.startOffset : 0;
+    const endOffset = typeof target.endOffset === 'number' ? target.endOffset : blockText.length;
 
-  let fromPos = Math.min(startOffset, blockText.length);
-  let toPos = Math.min(endOffset, blockText.length);
+    let fromPos = Math.min(startOffset, blockText.length);
+    let toPos = Math.min(endOffset, blockText.length);
 
-  // If anchorText is shorter than blockText, target was a sub-segment (e.g. Sentence 1 of a paragraph)
-  if (anchorText && anchorText.length < blockText.length) {
-    const words = anchorText.split(/\s+/).filter(Boolean);
-    if (words.length >= 2) {
-      // Check for trailing words of anchorText
-      const trailingPhrase = words.slice(-3).join(' ');
-      const trailingIdx = blockText.indexOf(trailingPhrase, fromPos);
-      if (trailingIdx !== -1) {
-        toPos = trailingIdx + trailingPhrase.length;
-      } else {
-        // Check for leading words of anchorText
-        const leadingPhrase = words.slice(0, 3).join(' ');
-        const leadingIdx = blockText.indexOf(leadingPhrase);
-        if (leadingIdx !== -1) {
-          fromPos = leadingIdx;
-          // Extend toPos to next sentence boundary/period if present
-          const nextPeriod = blockText.indexOf('. ', fromPos + 10);
-          if (nextPeriod !== -1) {
-            toPos = nextPeriod + 1;
-          } else {
-            toPos = blockText.length;
+    if (anchorText && anchorText.length < blockText.length) {
+      const words = anchorText.split(/\s+/).filter(Boolean);
+      if (words.length >= 2) {
+        const trailingPhrase = words.slice(-3).join(' ');
+        const trailingIdx = blockText.indexOf(trailingPhrase, fromPos);
+        if (trailingIdx !== -1) {
+          toPos = trailingIdx + trailingPhrase.length;
+        } else {
+          const leadingPhrase = words.slice(0, 3).join(' ');
+          const leadingIdx = blockText.indexOf(leadingPhrase);
+          if (leadingIdx !== -1) {
+            fromPos = leadingIdx;
+            const nextPeriod = blockText.indexOf('. ', fromPos + 10);
+            if (nextPeriod !== -1) {
+              toPos = nextPeriod + 1;
+            } else {
+              toPos = blockText.length;
+            }
           }
         }
       }
     }
+
+    if (toPos > fromPos) {
+      ranges.push({
+        from: block.pos + 1 + fromPos,
+        to: block.pos + 1 + toPos,
+      });
+    } else {
+      const from = block.pos + 1;
+      const to = Math.max(from, block.pos + block.node.nodeSize - 1);
+      ranges.push({ from, to });
+    }
   }
 
-  if (toPos > fromPos) {
-    return {
-      status: 'valid',
-      from: block.pos + 1 + fromPos,
-      to: block.pos + 1 + toPos,
-      blockPos: block.pos,
-      blockNode: block.node,
-    };
+  // 2. Include any additional blocks created for this task (e.g. via Enter key)
+  if (Array.isArray(target.additionalBlockIds) && target.additionalBlockIds.length > 0) {
+    target.additionalBlockIds.forEach((addBlockId) => {
+      const addBlock = findBlockByIdInDoc(doc, addBlockId);
+      if (addBlock) {
+        const from = addBlock.pos + 1;
+        const to = addBlock.pos + addBlock.node.nodeSize - 1;
+        if (from < to) {
+          ranges.push({ from, to });
+        }
+      }
+    });
   }
 
-  // 3. Whole block fallback (only if target was whole block or unsegmented)
-  const from = block.pos + 1;
-  const to = Math.max(from, block.pos + block.node.nodeSize - 1);
   return {
     status: 'valid',
-    from,
-    to,
+    from: ranges[0].from,
+    to: ranges[0].to,
+    ranges,
     blockPos: block.pos,
     blockNode: block.node,
   };
