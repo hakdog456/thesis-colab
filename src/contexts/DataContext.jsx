@@ -180,6 +180,24 @@ export function DataProvider({ children }) {
     }
   }, [editingTaskId, addToast]);
 
+  const voteToDeleteTask = useCallback((taskId) => {
+    try {
+      const result = dataService.voteToDeleteTask(taskId, currentUser.id);
+      if (result.deleted) {
+        if (selectedTaskId === taskId) setSelectedTaskId(null);
+        if (editingTaskId === taskId) setEditingTaskId(null);
+        addToast(`Task "${result.task.title}" deleted (3/3 unanimous team votes)`, 'success');
+      } else {
+        const votes = result.task.deleteVotes?.length || 0;
+        addToast(`Vote recorded (${votes}/3 team votes needed to delete)`, 'info');
+      }
+      return result;
+    } catch (err) {
+      addToast(err.message, 'error');
+      throw err;
+    }
+  }, [currentUser, selectedTaskId, editingTaskId, addToast]);
+
   const createTask = useCallback((taskData) => {
     try {
       const newTask = dataService.createTask({
@@ -240,6 +258,7 @@ export function DataProvider({ children }) {
         markTaskReviewed,
         requestTaskChanges,
         markTaskDone,
+        voteToDeleteTask,
         createTask,
         addComment,
         getChangeRecord,

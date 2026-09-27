@@ -22,7 +22,7 @@ export function TaskDetailsPanel({ onClose }) {
   const [isRequestingChanges, setIsRequestingChanges] = useState(false);
   const [isDroppingTask, setIsDroppingTask] = useState(false);
   const [dropReason, setDropReason] = useState('');
-  const { currentUser, getUser } = useAuth();
+  const { currentUser, users, getUser } = useAuth();
   const {
     selectedTask,
     editingTaskId,
@@ -34,6 +34,7 @@ export function TaskDetailsPanel({ onClose }) {
     markTaskReviewed,
     requestTaskChanges,
     markTaskDone,
+    voteToDeleteTask,
     getChangeRecord,
     addToast,
   } = useData();
@@ -420,6 +421,76 @@ export function TaskDetailsPanel({ onClose }) {
             <p className="task-desc-text">{selectedTask.description}</p>
           </div>
         )}
+
+        {/* Delete Task (3-User Consensus Vote) */}
+        {(() => {
+          const deleteVotes = selectedTask.deleteVotes || [];
+          const hasCurrentVoted = deleteVotes.includes(currentUser?.id);
+          const voteCount = deleteVotes.length;
+
+          return (
+            <div
+              style={{
+                marginTop: 20,
+                padding: 12,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-app)',
+                border: '1px solid var(--border-default)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Delete Task (Consensus Vote)
+                </span>
+                <span
+                  className={`badge ${voteCount === 3 ? 'badge-red' : 'badge-gray'}`}
+                  style={{ fontSize: 10 }}
+                >
+                  {voteCount}/3 Votes
+                </span>
+              </div>
+
+              <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 10 }}>
+                Requires unanimous agreement (3/3 votes from all teammates) to delete this task.
+              </p>
+
+              {/* Voter Status Badges */}
+              <div className="flex gap-2 mb-3">
+                {users.map((u) => {
+                  const voted = deleteVotes.includes(u.id);
+                  return (
+                    <div
+                      key={u.id}
+                      style={{
+                        flex: 1,
+                        padding: '4px 6px',
+                        borderRadius: 4,
+                        fontSize: 10,
+                        textAlign: 'center',
+                        background: voted ? 'rgba(239, 68, 68, 0.12)' : 'var(--bg-card)',
+                        color: voted ? '#EF4444' : 'var(--text-tertiary)',
+                        border: voted ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-default)',
+                        fontWeight: voted ? 600 : 400,
+                      }}
+                    >
+                      {voted ? '✓ ' : ''}{u.name}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                className={`btn ${hasCurrentVoted ? 'btn-secondary' : 'btn-danger'} btn-sm`}
+                style={{ width: '100%', gap: 6 }}
+                onClick={() => voteToDeleteTask(selectedTask.id)}
+              >
+                <Trash2 size={13} />
+                <span>{hasCurrentVoted ? 'Retract Deletion Vote' : `Vote to Delete Task (${voteCount}/3)`}</span>
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

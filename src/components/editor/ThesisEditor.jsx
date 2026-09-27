@@ -10,6 +10,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { EditingBanner } from './EditingBanner';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { findBlockByIdInDoc, navigateToBlock } from '../../utils/documentPositions';
+import { Plus } from 'lucide-react';
 
 export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection }) {
   const { currentUser, getUser } = useAuth();
@@ -295,19 +296,29 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
             hasSelection={hasSelection}
             onCreateTaskFromSelection={handleCreateTaskFromSelection}
           />
-        ) : (
-          hasSelection && onRequestCreateTaskWithSelection && (
-            <div className="selection-task-bar">
-              <span>Create a task from the highlighted text?</span>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={handleCreateTaskFromSelection}
-              >
-                Add Task
-              </button>
+        ) : null}
+
+        {/* Floating Selection Bar for creating a task (Section 2) */}
+        {!isEditingMode && hasSelection && onRequestCreateTaskWithSelection && (
+          <div className="selection-task-bar-floating">
+            <div className="selection-task-bar-content">
+              <span className="selection-task-bar-text">Create a task from highlighted text?</span>
+              {selectedTextMeta?.anchorText && (
+                <span className="selection-task-bar-quote" title={selectedTextMeta.anchorText}>
+                  "{selectedTextMeta.anchorText.slice(0, 35)}{selectedTextMeta.anchorText.length > 35 ? '...' : ''}"
+                </span>
+              )}
             </div>
-          )
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleCreateTaskFromSelection}
+              style={{ gap: 6, whiteSpace: 'nowrap' }}
+            >
+              <Plus size={14} />
+              <span>Add Task</span>
+            </button>
+          </div>
         )}
 
         <div className="editor-paper">

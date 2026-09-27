@@ -5,6 +5,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   getDocs,
   onSnapshot,
@@ -93,6 +94,15 @@ async function syncTaskToFirestore(taskData) {
     await setDoc(doc(db, 'tasks', taskData.id), taskData);
   } catch (e) {
     console.warn('Firestore task write error:', e);
+  }
+}
+
+async function deleteTaskFromFirestore(taskId) {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'tasks', taskId));
+  } catch (e) {
+    console.warn('Firestore task delete error:', e);
   }
 }
 
@@ -249,6 +259,7 @@ export const dataService = {
         targetStatus: 'valid',
       },
       dueDate: taskData.dueDate || null,
+      deleteVotes: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -522,6 +533,37 @@ export const dataService = {
     task.updatedAt = new Date().toISOString();
     syncTaskToFirestore(task);
     return clone(task);
+  },
+
+  voteToDeleteTask(taskId, userId) {
+    const taskIndex = tasks.findIndex((t) => t.id === taskId);
+    if (taskIndex === -1) throw new Error('Task not found');
+
+    const task = tasks[taskIndex];
+    if (!Array.isArray(task.deleteVotes)) {
+      task.deleteVotes = [];
+    }
+
+    const hasVoted = task.deleteVotes.includes(userId);
+    if (hasVoted) {
+      task.deleteVotes = task.deleteVotes.filter((id) => id !== userId);
+    } else {
+      task.deleteVotes.push(userId);
+    }
+
+    task.updatedAt = new Date().toISOString();
+
+    const totalRequiredVotes = users.length || 3;
+    if (task.deleteVotes.length >= totalRequiredVotes) {
+      // Unanimous agreement reached (3/3 votes) -> Delete task
+      const deletedTask = clone(task);
+      tasks.splice(taskIndex, 1);
+      deleteTaskFromFirestore(taskId);
+      return { deleted: true, task: deletedTask };
+    } else {
+      syncTaskToFirestore(task);
+      return { deleted: false, task: clone(task) };
+    }
   },
 
   getChangeRecords(documentId = 'doc-1') {
