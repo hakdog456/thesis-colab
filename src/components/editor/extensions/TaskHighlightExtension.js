@@ -1,8 +1,8 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { resolveTaskTarget } from '../../../utils/documentPositions';
-import { USER_COLORS, TASK_STATUS, getTaskColorMeta } from '../../../utils/constants';
+import { resolveTaskTarget, findBlockByIdInDoc } from '../../../utils/documentPositions';
+import { TASK_STATUS, getTaskColorMeta } from '../../../utils/constants';
 
 export const taskHighlightPluginKey = new PluginKey('taskHighlight');
 
@@ -38,8 +38,9 @@ export const TaskHighlightExtension = Extension.create({
               currentOptions = options;
               return computeDecorations(newState.doc, options);
             }
+            // Recompute on doc change so editing block highlight tracks live typing
             if (tr.docChanged) {
-              return oldSet.map(tr.mapping, newState.doc);
+              return computeDecorations(newState.doc, currentOptions);
             }
             return oldSet;
           },
@@ -125,13 +126,17 @@ function computeDecorations(doc, options) {
     if (isEditingThis && editingTargetBlockId) {
       const block = findBlockByIdInDoc(doc, editingTargetBlockId);
       if (block) {
-        decorations.push(
-          Decoration.inline(block.pos + 1, block.pos + block.node.nodeSize - 1, {
-            class: className.trim(),
-            'data-task-id': task.id,
-            'data-tooltip': labelText,
-          })
-        );
+        const from = block.pos + 1;
+        const to = block.pos + block.node.nodeSize - 1;
+        if (from < to) {
+          decorations.push(
+            Decoration.inline(from, to, {
+              class: className.trim(),
+              'data-task-id': task.id,
+              'data-tooltip': labelText,
+            })
+          );
+        }
         continue;
       }
     }
