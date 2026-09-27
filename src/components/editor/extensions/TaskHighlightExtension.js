@@ -13,6 +13,8 @@ export const TaskHighlightExtension = Extension.create({
     return {
       tasks: [],
       selectedTaskId: null,
+      editingTaskId: null,
+      editingTargetBlockId: null,
       getUser: null,
       onTaskClick: null,
     };
@@ -77,7 +79,13 @@ export const TaskHighlightExtension = Extension.create({
 });
 
 function computeDecorations(doc, options) {
-  const { tasks = [], selectedTaskId = null, getUser = null } = options;
+  const {
+    tasks = [],
+    selectedTaskId = null,
+    editingTaskId = null,
+    editingTargetBlockId = null,
+    getUser = null,
+  } = options;
   const decorations = [];
 
   for (const task of tasks) {
@@ -87,12 +95,8 @@ function computeDecorations(doc, options) {
 
     if (!task.target || !task.target.blockId) continue;
 
-    const resolution = resolveTaskTarget(doc, task.target);
-    if (resolution.status === 'needs_attention' || resolution.from === undefined) {
-      continue;
-    }
-
     const isSelected = task.id === selectedTaskId;
+    const isEditingThis = task.id === editingTaskId;
     const isChanged = task.status === TASK_STATUS.CHANGED;
     const isChangesRequested = task.status === TASK_STATUS.CHANGES_REQUESTED;
     const author = task.ownerId && getUser ? getUser(task.ownerId) : null;
@@ -115,6 +119,26 @@ function computeDecorations(doc, options) {
 
     if (isSelected) {
       className += 'task-highlight--emphasized ';
+    }
+
+    // If currently editing this task, highlight its entire active target block
+    if (isEditingThis && editingTargetBlockId) {
+      const block = findBlockByIdInDoc(doc, editingTargetBlockId);
+      if (block) {
+        decorations.push(
+          Decoration.inline(block.pos + 1, block.pos + block.node.nodeSize - 1, {
+            class: className.trim(),
+            'data-task-id': task.id,
+            'data-tooltip': labelText,
+          })
+        );
+        continue;
+      }
+    }
+
+    const resolution = resolveTaskTarget(doc, task.target);
+    if (resolution.status === 'needs_attention' || resolution.from === undefined) {
+      continue;
     }
 
     decorations.push(

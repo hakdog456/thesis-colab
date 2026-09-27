@@ -96,6 +96,8 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
       TaskHighlightExtension.configure({
         tasks,
         selectedTaskId,
+        editingTaskId,
+        editingTargetBlockId: targetBlockId,
         getUser,
         isEditingMode,
         onTaskClick: (taskId) => {
@@ -237,6 +239,8 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
       options: {
         tasks,
         selectedTaskId,
+        editingTaskId,
+        editingTargetBlockId: targetBlockId,
         getUser,
         isEditingMode,
         onTaskClick: (taskId) => {
@@ -245,7 +249,7 @@ export function ThesisEditor({ onSelectTask, onRequestCreateTaskWithSelection })
       },
     });
     editor.view.dispatch(tr);
-  }, [tasks, selectedTaskId, isEditingMode, getUser, onSelectTask, editor, currentUser, startEditingTask]);
+  }, [tasks, selectedTaskId, editingTaskId, targetBlockId, isEditingMode, getUser, onSelectTask, editor, currentUser, startEditingTask]);
 
   // Re-sync document content when official document changes externally (e.g. from teammate or reset)
   useEffect(() => {
